@@ -1,0 +1,17 @@
+{
+  "name": "Artemis Tracker",
+  "short_name": "Artemis",
+  "description": "Poloha kosmické lodě Orion v reálném čase",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#181E25",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

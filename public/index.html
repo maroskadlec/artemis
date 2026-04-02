@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artemis Tracker</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <meta name="theme-color" content="#181E25">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Artemis">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --glass: #F3F5F7;
+      --glass-hover: #e8ebee;
+      --glass-border: #DCE0E3;
+      --text: #181E25;
+      --text-secondary: rgba(24, 30, 37, 0.65);
+      --text-tertiary: rgba(24, 30, 37, 0.4);
+      --accent: #01FF94;
+      --accent-light: rgba(1, 255, 148, 0.15);
+      --warn: #ff9500;
+      --warn-light: rgba(255, 149, 0, 0.12);
+      --radius: 24px;
+      --radius-sm: 14px;
+      --font: 'Inter', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 48px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Header */
+    .header { padding: 8px 8px 4px; }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Visualization card */
+    .vis-card {
+      background: var(--glass);
+      border-radius: var(--radius);
+      border: 1px solid var(--glass-border);
+      padding: 28px 24px 20px;
+    }
+
+    .vis-card svg { width: 100%; height: auto; display: block; }
+
+    /* Distance cards */
+    .card {
+      background: var(--glass);
+      border-radius: var(--radius);
+      border: 1px solid var(--glass-border);
+      padding: 24px 32px;
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 10px;
+    }
+
+    .distance-row { display: flex; align-items: baseline; gap: 6px; }
+
+    .distance-value {
+      font-size: clamp(26px, 8vw, 38px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .distance-unit {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .bar-wrap {
+      height: 5px;
+      background: rgba(0, 0, 0, 0.08);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+
+    .bar {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      width: 0%;
+    }
+
+    .bar-earth { background: #1C2129; }
+    .bar-moon  { background: #ffae5d; }
+
+    /* Status row */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-tertiary);
+      flex-shrink: 0;
+    }
+
+    .dot.live  { background: var(--accent); }
+    .dot.warn  { background: var(--warn); }
+    .dot.error { background: #ff3b30; }
+
+    .status-text {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    /* Alert */
+    .alert {
+      padding: 18px 32px;
+      background: var(--warn-light);
+      border-radius: var(--radius);
+      border: 1px solid var(--glass-border);
+      font-size: 13px;
+      color: #7a4500;
+      line-height: 1.5;
+      display: none;
+    }
+
+    /* Skeleton shimmer for loading */
+    @keyframes shimmer {
+      0%   { opacity: 0.4; }
+      50%  { opacity: 0.8; }
+      100% { opacity: 0.4; }
+    }
+    .loading { animation: shimmer 1.4s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="section-label">NASA · Horizons</div>
+      <h1>Artemis Tracker</h1>
+      <p class="subtitle">Artemis II · Orion v reálném čase</p>
+    </div>
+
+    <!-- Visualization -->
+    <div class="vis-card">
+      <svg id="vis" viewBox="0 0 432 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="earthGrad" cx="38%" cy="35%" r="65%">
+            <stop offset="0%"   stop-color="#4A90D9"/>
+            <stop offset="45%"  stop-color="#2E7D32"/>
+            <stop offset="100%" stop-color="#0D1B2A"/>
+          </radialGradient>
+          <radialGradient id="moonGrad" cx="38%" cy="32%" r="68%">
+            <stop offset="0%"   stop-color="#E8ECF0"/>
+            <stop offset="100%" stop-color="#8A8F96"/>
+          </radialGradient>
+          <radialGradient id="earthAtm" cx="50%" cy="50%" r="50%">
+            <stop offset="70%" stop-color="transparent"/>
+            <stop offset="100%" stop-color="rgba(74,144,217,0.15)"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Dashed orbit track -->
+        <line x1="88" y1="80" x2="356" y2="80"
+              stroke="#DCE0E3" stroke-width="1" stroke-dasharray="5 5"/>
+
+        <!-- Earth -->
+        <circle cx="56" cy="80" r="34" fill="#0D1B2A"/>
+        <circle cx="56" cy="80" r="34" fill="url(#earthGrad)"/>
+        <circle cx="56" cy="80" r="38" fill="url(#earthAtm)"/>
+        <!-- cloud hint -->
+        <ellipse cx="48" cy="68" rx="9" ry="4" fill="white" opacity="0.06" transform="rotate(-15 48 68)"/>
+
+        <!-- Moon -->
+        <circle cx="376" cy="80" r="24" fill="#C8CDD4"/>
+        <circle cx="376" cy="80" r="24" fill="url(#moonGrad)"/>
+        <!-- craters -->
+        <circle cx="367" cy="73" r="4.5" fill="#B0B5BC" opacity="0.6"/>
+        <circle cx="381" cy="87" r="3"   fill="#B0B5BC" opacity="0.55"/>
+        <circle cx="372" cy="90" r="2"   fill="#B0B5BC" opacity="0.45"/>
+        <circle cx="385" cy="72" r="2.5" fill="#B0B5BC" opacity="0.4"/>
+
+        <!-- Distance lines (updated by JS) -->
+        <line id="lineEarth" x1="90" y1="80" x2="208" y2="80"
+              stroke="#181E25" stroke-width="1.5" opacity="0.2"/>
+        <line id="lineMoon"  x1="224" y1="80" x2="352" y2="80"
+              stroke="#ffae5d" stroke-width="1.5" opacity="0.25"/>
+
+        <!-- Spacecraft (updated by JS) -->
+        <g id="spacecraft" transform="translate(216, 80)">
+          <!-- body -->
+          <rect x="-9" y="-5.5" width="18" height="11" rx="3.5" fill="#1C2129"/>
+          <!-- solar panels -->
+          <rect x="-21" y="-2.5" width="10" height="5" rx="1.5" fill="#DCE0E3"/>
+          <rect x="11"  y="-2.5" width="10" height="5" rx="1.5" fill="#DCE0E3"/>
+          <!-- engine nozzle -->
+          <rect x="-3" y="5.5" width="6" height="3" rx="1" fill="#2e3745"/>
+          <!-- thruster glow -->
+          <ellipse cx="0" cy="9.5" rx="3" ry="1.5" fill="#01FF94" opacity="0.6"/>
+          <!-- status light -->
+          <circle cx="0" cy="-1" r="2" fill="#01FF94" id="scLight"/>
+        </g>
+
+        <!-- Labels -->
+        <text x="56"  y="125" text-anchor="middle" font-family="Inter, sans-serif"
+              font-size="9" font-weight="600" fill="rgba(24,30,37,0.35)" letter-spacing="0.06em">ZEMĚ</text>
+        <text x="376" y="115" text-anchor="middle" font-family="Inter, sans-serif"
+              font-size="9" font-weight="600" fill="rgba(24,30,37,0.35)" letter-spacing="0.06em">MĚSÍC</text>
+      </svg>
+    </div>
+
+    <!-- Distance from Earth -->
+    <div class="card">
+      <div class="card-label">Vzdálenost od Země</div>
+      <div class="distance-row">
+        <span class="distance-value loading" id="earthVal">—</span>
+        <span class="distance-unit">km</span>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar bar-earth" id="earthBar"></div>
+      </div>
+    </div>
+
+    <!-- Distance from Moon -->
+    <div class="card">
+      <div class="card-label">Vzdálenost od Měsíce</div>
+      <div class="distance-row">
+        <span class="distance-value loading" id="moonVal">—</span>
+        <span class="distance-unit">km</span>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar bar-moon" id="moonBar"></div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-row">
+      <div class="dot" id="dot"></div>
+      <span class="status-text" id="statusText">Načítám data z NASA Horizons…</span>
+    </div>
+
+    <!-- Alert -->
+    <div class="alert" id="alert"></div>
+
+  </div>
+
+  <script>
+    const EARTH_MOON_KM = 384400;
+
+    // ── UI helpers ────────────────────────────────────────────────────────
+
+    function setStatus(type, text) {
+      const dot = document.getElementById('dot');
+      dot.className = `dot ${type}`;
+      document.getElementById('statusText').textContent = text;
+    }
+
+    function showAlert(msg) {
+      const el = document.getElementById('alert');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function stopLoading() {
+      document.getElementById('earthVal').classList.remove('loading');
+      document.getElementById('moonVal').classList.remove('loading');
+    }
+
+    function updateCard(valId, barId, km) {
+      document.getElementById(valId).textContent = Math.round(km).toLocaleString('cs-CZ');
+      const pct = Math.min((km / EARTH_MOON_KM) * 100, 100);
+      document.getElementById(barId).style.width = `${pct}%`;
+    }
+
+    function updateVis(earthKm) {
+      const TRACK_START = 88, TRACK_END = 352;
+      const frac = Math.min(Math.max(earthKm / EARTH_MOON_KM, 0.02), 0.98);
+      const x = TRACK_START + frac * (TRACK_END - TRACK_START);
+      document.getElementById('spacecraft').setAttribute('transform', `translate(${x}, 80)`);
+      document.getElementById('lineEarth').setAttribute('x2', String(x - 10));
+      document.getElementById('lineMoon').setAttribute('x1', String(x + 10));
+    }
+
+    // ── Main ──────────────────────────────────────────────────────────────
+
+    async function main() {
+      try {
+        const res = await fetch('/api/distance');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (!data.earthKm) {
+          stopLoading();
+          setStatus('warn', 'Data nedostupná');
+          showAlert('Kosmická loď Artemis / Orion momentálně není sledována systémem NASA Horizons. Živá data jsou dostupná pouze po dobu aktivní mise.');
+          return;
+        }
+
+        stopLoading();
+        updateCard('earthVal', 'earthBar', data.earthKm);
+        if (data.moonKm) updateCard('moonVal', 'moonBar', data.moonKm);
+        updateVis(data.earthKm);
+
+        const now = new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+        setStatus('live', `Živá data · aktualizováno ${now}`);
+
+      } catch (err) {
+        stopLoading();
+        setStatus('error', 'Chyba při načítání');
+        showAlert('Nepodařilo se připojit k serveru. Spusťte: node server.js');
+        console.error(err);
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>
